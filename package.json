@@ -1,0 +1,28 @@
+{
+  "name": "wulweth-research-publishing",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Wulweth Research & Publishing — managed marketplace platform exclusively for research work.",
+  "scripts": {
+    "dev": "next dev -H 0.0.0.0 -p 3000",
+    "build": "next build",
+    "start": "next start -H 0.0.0.0 -p 3000",
+    "setup": "node db/init.mjs && node db/seed.mjs",
+    "db:reset": "node db/init.mjs --reset && node db/seed.mjs"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "next": "^15.2.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.7.0"
+  }
+}
