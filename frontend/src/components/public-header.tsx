@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "@/components/auth";
+import { LogoMark } from "@/components/logo-mark";
 import { Avatar } from "@/components/ui";
 
 const NAV = [
@@ -20,9 +21,7 @@ const NAV = [
 export function Logo({ light = false, compact = false }: { light?: boolean; compact?: boolean }) {
   return (
     <Link href="/" className="group inline-flex items-center gap-2.5" aria-label="Wulweth Research & Publishing — home">
-      <span className={`flex h-9 w-9 items-center justify-center rounded-lg font-display text-lg font-bold ${light ? "bg-teal-400/90 text-ink-800" : "bg-ink-600 text-teal-100"}`} aria-hidden="true">
-        W
-      </span>
+      <LogoMark light={light} className="h-[30px] w-auto shrink-0 transition-transform group-hover:-translate-y-px" />
       {!compact && (
         <span className="leading-tight">
           <span className={`block font-display text-[17px] font-semibold ${light ? "text-white" : "text-ink-600"}`}>Wulweth</span>

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 368 228" role="img" aria-label="Wulweth">
+  <!-- red accent -->
+  <path d="M301 10 L357 10 L323 100 L267 100 Z" fill="#E63B2E"/>
+  <!-- zigzag mark -->
+  <path d="M34 186 L102 56 L170 186 L238 56 L306 186 L352 119"
+        fill="none" stroke="#262B3D" stroke-width="46"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
