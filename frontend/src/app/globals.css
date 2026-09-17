@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --nav-h: 68px;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-white font-sans text-slate-700 antialiased;
+  }
+  ::selection {
+    @apply bg-teal-100 text-teal-900;
+  }
+  h1, h2, h3, h4 {
+    @apply font-display text-ink-600;
+  }
+  :focus-visible {
+    @apply outline-none ring-2 ring-teal-500 ring-offset-2;
+  }
+}
+
+@layer components {
+  .container-w {
+    @apply mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8;
+  }
+  .eyebrow {
+    @apply text-xs font-semibold uppercase tracking-[0.18em] text-teal-600;
+  }
+  .section {
+    @apply py-16 sm:py-20;
+  }
+  .link {
+    @apply font-medium text-teal-700 underline decoration-teal-300 underline-offset-4 hover:text-teal-800;
+  }
+  .prose-w p {
+    @apply mb-4 leading-relaxed;
+  }
+  .prose-w ul {
+    @apply mb-4 list-disc space-y-1.5 pl-5;
+  }
+  .prose-w h3 {
+    @apply mb-2 mt-6 text-lg font-semibold;
+  }
+}
+
+@layer utilities {
+  .grid-bg {
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+    background-size: 44px 44px;
+  }
+  .scrollbar-thin {
+    scrollbar-width: thin;
+  }
+}
+
+@media print {
+  .no-print { display: none !important; }
+}
