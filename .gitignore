@@ -19,3 +19,11 @@ prisma/dev.db-journal
 .DS_Store
 *.tsbuildinfo
 next-env.d.ts
+
+# python
+__pycache__/
+*.pyc
+.venv/
+
+# backend runtime data (encrypted document storage, sqlite dev db)
+backend/.data/
