@@ -15,7 +15,6 @@ from app.db import get_db
 from app.models import AuthEvent, Organization, OrganizationMember, ResearcherProfile, User
 from app.models_enums import UserRole, UserStatus
 from app.services import notify
-from app.services.ids import next_number  # noqa: F401  (kept for symmetry)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 

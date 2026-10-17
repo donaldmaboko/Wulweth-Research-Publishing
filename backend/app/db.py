@@ -8,11 +8,17 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.core.config import settings
 
+# Pool sizing applies to server-backed dialects only; SQLite (local-dev fallback)
+# uses a simple connection pool and rejects these keyword arguments.
+_is_sqlite = settings.database_url.startswith("sqlite")
+
 engine = create_engine(
     settings.database_url,
     pool_pre_ping=True,
-    pool_size=settings.db_pool_size,
-    max_overflow=settings.db_max_overflow,
+    **({} if _is_sqlite else {
+        "pool_size": settings.db_pool_size,
+        "max_overflow": settings.db_max_overflow,
+    }),
     future=True,
 )
 
