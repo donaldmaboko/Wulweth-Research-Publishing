@@ -19,7 +19,6 @@ from app.routers.common import jdump, page_params, paged, pick
 from app.services.ids import next_number
 from app.services.integrity import INTEGRITY_EXPLANATION, screen_content
 from app.services.notify import notify
-from app.services.projects_flow import record_status, transition_project  # noqa: F401
 
 router = APIRouter(tags=["research-requests"])
 

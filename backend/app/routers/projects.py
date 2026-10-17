@@ -12,8 +12,8 @@ from app.core.deps import audit, get_current_user, is_staff, require_staff
 from app.db import get_db
 from app.models import (
     Conversation, Deliverable, DeliverableVersion, Document, Invoice, Organization,
-    Project, ProjectAssignment, ProjectMilestone, ProjectStatusHistory, Quote,
-    ResearchRequest, ResearcherProfile, Service, User,
+    OrganizationMember, Project, ProjectAssignment, ProjectMilestone, ProjectStatusHistory,
+    Quote, ResearchRequest, ResearcherProfile, Service, User,
 )
 from app.models_enums import (
     AssignmentStatus, DeliverableStatus, InvoiceStatus, MilestoneStatus,
@@ -21,7 +21,12 @@ from app.models_enums import (
 )
 from app.routers.common import jdump, page_params, paged, pick
 from app.services.notify import notify
-from app.services.projects_flow import ensure_conversation, transition_project
+from app.services.projects_flow import (
+    PROFESSIONAL_TRANSITIONS,
+    ensure_conversation,
+    record_status,
+    transition_project,
+)
 
 router = APIRouter(tags=["projects"])
 
@@ -35,7 +40,6 @@ def _can_access(db: Session, user: User, p: Project) -> bool:
         return True
     # organization members can view their org projects
     if p.organization_id:
-        from app.models import OrganizationMember
         member = db.scalar(select(OrganizationMember).where(
             OrganizationMember.organization_id == p.organization_id, OrganizationMember.user_id == user.id))
         if member:
@@ -43,12 +47,20 @@ def _can_access(db: Session, user: User, p: Project) -> bool:
     return False
 
 
+def get_project_or_404(db: Session, pid: str) -> Project:
+    """Fetch a live project or raise 404 (shared by all project routes)."""
+    p = db.get(Project, pid)
+    if not p or p.deleted_at:
+        raise HTTPException(404, "Project not found")
+    return p
+
+
 def workspace_dict(db: Session, p: Project) -> dict:
     client = db.get(User, p.client_id)
     professional = db.get(User, p.assigned_professional_id) if p.assigned_professional_id else None
     org = db.get(Organization, p.organization_id) if p.organization_id else None
-    service = db.get(Service := __import__("app.models", fromlist=["Service"]).Service, p.service_id) if p.service_id else None
-    request = db.get(ResearchRequest := __import__("app.models", fromlist=["ResearchRequest"]).ResearchRequest, p.request_id) if p.request_id else None
+    service = db.get(Service, p.service_id) if p.service_id else None
+    request = db.get(ResearchRequest, p.request_id) if p.request_id else None
 
     deliverables = db.scalars(select(Deliverable).where(Deliverable.project_id == p.id).order_by(Deliverable.created_at)).all()
     deliverable_data = []
@@ -101,9 +113,6 @@ def workspace_dict(db: Session, p: Project) -> dict:
     )
 
 
-from app.models import ResearchRequest, Service  # noqa: F401  (explicit re-import)
-
-
 @router.get("/projects")
 def list_projects(db: Session = Depends(get_db), user: User = Depends(get_current_user),
                   params: dict = Depends(page_params), status: str | None = None, q: str | None = None):
@@ -128,8 +137,8 @@ def list_projects(db: Session = Depends(get_db), user: User = Depends(get_curren
 
 @router.get("/projects/{pid}")
 def get_project(pid: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    p = db.get(Project, pid)
-    if not p or p.deleted_at or not _can_access(db, user, p):
+    p = get_project_or_404(db, pid)
+    if not _can_access(db, user, p):
         raise HTTPException(404, "Project not found")
     return workspace_dict(db, p)
 
@@ -142,16 +151,13 @@ class StatusIn(BaseModel):
 @router.post("/projects/{pid}/status")
 def change_status(pid: str, payload: StatusIn, request: Request, db: Session = Depends(get_db),
                   user: User = Depends(get_current_user)):
-    p = db.get(Project, pid)
-    if not p or p.deleted_at or not _can_access(db, user, p):
+    p = get_project_or_404(db, pid)
+    if not _can_access(db, user, p):
         raise HTTPException(404, "Project not found")
     if not is_staff(user):
-        # professionals may advance their own work states
-        if p.assigned_professional_id != user.id or (p.status, payload.status) not in {
-            (ProjectStatus.PROFESSIONAL_ASSIGNED.value, ProjectStatus.IN_PROGRESS.value),
-            (ProjectStatus.IN_PROGRESS.value, ProjectStatus.SUBMITTED.value),
-            (ProjectStatus.REVISION_REQUIRED.value, ProjectStatus.IN_PROGRESS.value),
-        }:
+        # professionals may advance their own work states (single source of truth in projects_flow)
+        pair = (p.status, payload.status)
+        if p.assigned_professional_id != user.id or pair not in PROFESSIONAL_TRANSITIONS:
             raise HTTPException(403, "Only Wulweth staff can change project status")
     transition_project(db, p, payload.status, user, payload.note or None)
     audit(db, request, user, "project.status_changed", "project", p.id,
@@ -170,9 +176,7 @@ class MilestoneIn(BaseModel):
 
 @router.post("/projects/{pid}/milestones", status_code=201)
 def add_milestone(pid: str, payload: MilestoneIn, db: Session = Depends(get_db), user: User = Depends(require_staff)):
-    p = db.get(Project, pid)
-    if not p or p.deleted_at:
-        raise HTTPException(404, "Project not found")
+    p = get_project_or_404(db, pid)
     m = ProjectMilestone(project_id=p.id, **payload.model_dump())
     db.add(m)
     db.commit()
@@ -183,11 +187,10 @@ def add_milestone(pid: str, payload: MilestoneIn, db: Session = Depends(get_db),
 def update_milestone(pid: str, mid: str, payload: MilestoneIn, db: Session = Depends(get_db),
                      user: User = Depends(get_current_user)):
     m = db.get(ProjectMilestone, mid)
-    p = db.get(Project, pid) if m else None
-    if not m or not p or m.project_id != pid:
+    if not m or m.project_id != pid:
         raise HTTPException(404, "Milestone not found")
-    allowed = is_staff(user) or p.assigned_professional_id == user.id
-    if not allowed:
+    p = get_project_or_404(db, pid)
+    if not (is_staff(user) or p.assigned_professional_id == user.id):
         raise HTTPException(403, "Not permitted")
     for field, value in payload.model_dump().items():
         setattr(m, field, value)
@@ -216,9 +219,7 @@ class AssignIn(BaseModel):
 @router.post("/projects/{pid}/assign")
 def assign_professional(pid: str, payload: AssignIn, request: Request, db: Session = Depends(get_db),
                         user: User = Depends(require_staff)):
-    p = db.get(Project, pid)
-    if not p or p.deleted_at:
-        raise HTTPException(404, "Project not found")
+    p = get_project_or_404(db, pid)
     if p.status not in {ProjectStatus.PAYMENT_CONFIRMED.value, ProjectStatus.PROFESSIONAL_ASSIGNED.value}:
         raise HTTPException(409, "Professionals are assigned after payment confirmation. Current status: "
                                   + p.status.replace("_", " ").title())
@@ -296,9 +297,7 @@ def decline_assignment(aid: str, request: Request, db: Session = Depends(get_db)
 @router.get("/projects/{pid}/suggested-professionals")
 def suggested_professionals(pid: str, db: Session = Depends(get_db), user: User = Depends(require_staff)):
     """Decision-support for manual matching (intelligent matching arrives later)."""
-    p = db.get(Project, pid)
-    if not p or p.deleted_at:
-        raise HTTPException(404, "Project not found")
+    p = get_project_or_404(db, pid)
     request = db.get(ResearchRequest, p.request_id) if p.request_id else None
     keywords: list[str] = []
     if request:
